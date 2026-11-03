@@ -1,7 +1,6 @@
 # ️ MiniAppCitra
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 [![PySide6](https://img.shields.io/badge/GUI-PySide6-41CD52?logo=qt&logoColor=white)](https://doc.qt.io/qtforpython-6/)
 [![OpenCV](https://img.shields.io/badge/OpenCV-5.0.0-white?logo=opencv&logoColor=white)](https://opencv.org/)
 
