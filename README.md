@@ -27,11 +27,6 @@ Aplikasi ini menyelesaikan masalah umum dalam pembelajaran pengolahan citra, yai
 - Mode *raw feed* untuk melihat video mentah di panel kiri
 - Ganti metode secara dinamis tanpa menghentikan webcam
 
-### 📊 Histogram Real-Time
-- Visualisasi distribusi intensitas piksel secara *live*
-- Update otomatis setiap 5 frame untuk performa optimal
-- Mendukung citra berwarna (RGB) dan grayscale
-
 ### Antarmuka Intuitif
 - Panel input dinamis yang berubah sesuai metode yang dipilih
 - Tombol Reset untuk mengembalikan aplikasi ke kondisi awal
@@ -94,10 +89,10 @@ pengolahan_citra/
 │ └── rotation.py # Rotasi citra
 │
 └── utils/ # Modul utilitas
-├── init.py
-├── image_utils.py # Konversi cv2 ↔ QPixmap (BGR ↔ RGB)
-├── constants.py # Konstanta global & konfigurasi
-└── webcam_worker.py # QThread untuk pembacaan webcam real-time
+  ├── init.py
+  ├── image_utils.py # Konversi cv2 ↔ QPixmap (BGR ↔ RGB)
+  ├── constants.py # Konstanta global & konfigurasi
+  └── webcam_worker.py # QThread untuk pembacaan webcam real-time
 ```
 
 ---
