@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QWidget
-from PySide6.QtGui import QPainter, QColor
+from PySide6.QtGui import QPainter, QColor, QFont
 import numpy as np
 
 
@@ -64,33 +64,58 @@ class HistogramWidget(QWidget):
         self._counts = None
         self.update()
 
+    @staticmethod
+    def _nice(v):
+        """Bulatkan ke angka 'nice' (1/2/5 * 10^n)."""
+        if v <= 0:
+            return 0
+        exp = int(np.floor(np.log10(v)))
+        base = 10 ** exp
+        for m in (1, 2, 5, 10):
+            if v <= m * base:
+                return int(m * base)
+        return int(base * 10)
+
+    @staticmethod
+    def _fmt_count(v):
+        """Format jumlah piksel ringkas: 150000 -> '150k'."""
+        if v >= 1000:
+            return f"{v / 1000:.0f}k"
+        return str(int(v))
+
     def paintEvent(self, event):
         p = QPainter(self)
         w, h = self.width(), self.height()
         p.fillRect(self.rect(), self.BG_COLOR)
 
+        # Margin untuk label sumbu
+        mL, mR, mT, mB = 44, 6, 4, 16
+        pw = max(10, w - mL - mR)
+        ph = max(10, h - mT - mB)
+        x0, y0 = mL, mT
+
         c = self._counts
         if c is None:
+            p.setPen(QColor(120, 120, 120))
+            p.drawRect(x0, y0, pw, ph)
             p.end()
             return
 
         raw = c.astype(np.float64)
         n_channels = raw.shape[1] if raw.ndim == 2 else 1
 
-        # Histogram biner/tepi sangat jarang (hanya beberapa bin berisi) —
-        # dengan skala linear hampir seluruh area tampak kosong. Deteksi
-        # sparse dan gunakan skala log10 agar lonjakan tetap terlihat.
+        # Histogram biner/tepi sangat jarang — gunakan skala log10 agar
+        # lonjakan tetap terlihat.
         sparse = float((raw > 0).mean()) < 0.1
-        if sparse:
-            data = np.log10(1.0 + raw)
-        else:
-            data = raw
+        transform = (lambda v: np.log10(1.0 + v)) if sparse else (lambda v: v)
+        data = transform(raw)
+        dmax = float(data.max()) if data.size else 1.0
+        if dmax <= 0:
+            dmax = 1.0
 
-        ymax = float(data.max()) if data.size else 1.0
-        if ymax <= 0:
-            ymax = 1.0
-        scale = (h - 4) / ymax
-        bar_w = max(1, int(w / 256))
+        def y_for(count):
+            d = float(transform(np.array([count]))[0])
+            return y0 + ph - (d / dmax) * ph
 
         if n_channels == 3:
             colors = self.CHANNEL_COLORS
@@ -99,19 +124,37 @@ class HistogramWidget(QWidget):
             colors = (self.GRAY_COLOR,)
             heights = data.reshape(1, -1)
 
-        # Garis dasar sumbu
-        p.setPen(QColor(120, 120, 120))
-        p.drawLine(0, h - 2, w, h - 2)
-
+        # Batang histogram
+        bar_w = max(1, int(pw / 256))
         for ch in range(n_channels):
             p.setPen(colors[ch])
             p.setBrush(colors[ch])
             row = heights[ch]
             for x in range(256):
-                px = int(x * w / 256)
-                val = float(row[x]) * scale
-                y = int(h - 2 - val)
-                if y < h - 2:
-                    p.drawRect(px, y, bar_w, h - 2 - y)
+                px = x0 + int(x * pw / 256)
+                val = float(row[x]) / dmax * ph
+                y = int(y0 + ph - val)
+                if y < y0 + ph:
+                    p.drawRect(px, y, bar_w, y0 + ph - y)
+
+        # Bingkai + garis dasar
+        p.setPen(QColor(120, 120, 120))
+        p.drawRect(x0, y0, pw, ph)
+        p.setFont(QFont("Arial", 7))
+
+        # Sumbu X: nilai piksel (0, 64, 128, 192, 255)
+        for v in (0, 64, 128, 192, 255):
+            px = x0 + int(v * pw / 256)
+            p.drawLine(px, y0 + ph, px, y0 + ph + 3)
+            label = str(v)
+            tw = p.fontMetrics().horizontalAdvance(label)
+            p.drawText(int(px - tw / 2), y0 + ph + 12, label)
+
+        # Sumbu Y: jumlah piksel (0, setengah max, max — angka nice)
+        ticks = sorted(set([0, self._nice(raw.max() / 2), self._nice(raw.max())]))
+        for t in ticks:
+            ty = int(min(max(y_for(t), y0), y0 + ph))
+            p.drawLine(x0 - 3, ty, x0, ty)
+            p.drawText(4, max(ty, y0 + 7) + 3, self._fmt_count(t))
 
         p.end()
