@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import QWidget
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QPainter, QColor, QFont
 import numpy as np
 
@@ -18,12 +19,13 @@ class HistogramWidget(QWidget):
       - clear()                         : kosongkan grafik
     """
 
+    BG_COLOR = QColor("#ffffff")
     CHANNEL_COLORS = (
-        QColor(255, 0, 0, 160),
-        QColor(0, 170, 0, 160),
-        QColor(0, 0, 255, 160),
+        QColor(255, 0, 0),
+        QColor(0, 170, 0),
+        QColor(0, 0, 255),
     )
-    GRAY_COLOR = QColor(40, 40, 40, 190)
+    GRAY_COLOR = QColor(40, 40, 40)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -85,6 +87,7 @@ class HistogramWidget(QWidget):
     def paintEvent(self, event):
         p = QPainter(self)
         w, h = self.width(), self.height()
+        p.fillRect(self.rect(), self.BG_COLOR)
 
         # Margin untuk label sumbu
         mL, mR, mT, mB = 44, 6, 4, 16
@@ -122,18 +125,18 @@ class HistogramWidget(QWidget):
             colors = (self.GRAY_COLOR,)
             heights = data.reshape(1, -1)
 
-        # Batang histogram
-        bar_w = max(1, int(pw / 256))
+        # Batang histogram (opaque, tanpa isian melebar agar kotak tidak
+        # terlihat 'diwarnai' merata oleh tumpang-tindih transparan)
         for ch in range(n_channels):
             p.setPen(colors[ch])
-            p.setBrush(colors[ch])
+            p.setBrush(Qt.NoBrush)
             row = heights[ch]
             for x in range(256):
                 px = x0 + int(x * pw / 256)
                 val = float(row[x]) / dmax * ph
                 y = int(y0 + ph - val)
                 if y < y0 + ph:
-                    p.drawRect(px, y, bar_w, y0 + ph - y)
+                    p.drawLine(px, y0 + ph, px, y)
 
         # Bingkai + garis dasar
         p.setPen(QColor(120, 120, 120))
