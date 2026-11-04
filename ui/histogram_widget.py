@@ -74,18 +74,30 @@ class HistogramWidget(QWidget):
             p.end()
             return
 
-        n_channels = c.shape[1] if c.ndim == 2 else 1
-        ymax = float(c.max()) if c.size else 1.0
+        raw = c.astype(np.float64)
+        n_channels = raw.shape[1] if raw.ndim == 2 else 1
+
+        # Histogram biner/tepi sangat jarang (hanya beberapa bin berisi) —
+        # dengan skala linear hampir seluruh area tampak kosong. Deteksi
+        # sparse dan gunakan skala log10 agar lonjakan tetap terlihat.
+        sparse = float((raw > 0).mean()) < 0.1
+        if sparse:
+            data = np.log10(1.0 + raw)
+        else:
+            data = raw
+
+        ymax = float(data.max()) if data.size else 1.0
         if ymax <= 0:
             ymax = 1.0
         scale = (h - 4) / ymax
+        bar_w = max(1, int(w / 256))
 
         if n_channels == 3:
             colors = self.CHANNEL_COLORS
-            heights = c.transpose()  # (3, 256)
+            heights = data.transpose()  # (3, 256)
         else:
             colors = (self.GRAY_COLOR,)
-            heights = c.reshape(1, -1)
+            heights = data.reshape(1, -1)
 
         # Garis dasar sumbu
         p.setPen(QColor(120, 120, 120))
@@ -93,10 +105,13 @@ class HistogramWidget(QWidget):
 
         for ch in range(n_channels):
             p.setPen(colors[ch])
+            p.setBrush(colors[ch])
             row = heights[ch]
             for x in range(256):
                 px = int(x * w / 256)
                 val = float(row[x]) * scale
-                p.drawLine(px, h - 2, px, int(h - 2 - val))
+                y = int(h - 2 - val)
+                if y < h - 2:
+                    p.drawRect(px, y, bar_w, h - 2 - y)
 
         p.end()
