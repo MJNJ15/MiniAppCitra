@@ -9,7 +9,8 @@ class ImagePanel(QWidget):
         super().__init__(parent)
         
         self._original_pixmap = None  # Menyimpan QPixmap asli untuk di-rescale
-        
+        self._smooth_scaling = True   # True = halus (mode statis), False = cepat (webcam)
+
         # Setup UI
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignCenter)
@@ -25,28 +26,40 @@ class ImagePanel(QWidget):
         layout.setContentsMargins(5, 5, 5, 5)
         self.setLayout(layout)
 
-    def set_image(self, pixmap: QPixmap):
-        """Menerima QPixmap dan menampilkannya."""
+    def set_image(self, pixmap: QPixmap, smooth: bool = True):
+        """
+        Menerima QPixmap dan menampilkannya.
+
+        Args:
+            smooth: True → interpolasi halus (kualitas terbaik, cocok untuk mode statis).
+                    False → scaling cepat untuk feed webcam real-time agar lebih ringan.
+        """
         if pixmap.isNull():
             self.clear()
             return
-            
+
         self._original_pixmap = pixmap
+        self._smooth_scaling = smooth
         self._update_scaled_image()
 
     def _update_scaled_image(self):
         """Menyesuaikan ukuran pixmap dengan ukuran label saat ini."""
         if self._original_pixmap:
+            transform = Qt.SmoothTransformation if self._smooth_scaling else Qt.FastTransformation
             scaled_pixmap = self._original_pixmap.scaled(
-                self.image_label.size(), 
-                Qt.KeepAspectRatio, 
-                Qt.SmoothTransformation
+                self.image_label.size(),
+                Qt.KeepAspectRatio,
+                transform,
             )
             self.image_label.setPixmap(scaled_pixmap)
 
     def update_histogram(self, image_np: np.ndarray):
         """Meneruskan data array NumPy ke widget histogram."""
         self.histogram_widget.update_histogram(image_np)
+
+    def update_histogram_counts(self, counts):
+        """Meneruskan data histogram yang sudah dihitung (path webcam real-time)."""
+        self.histogram_widget.update_histogram_counts(counts)
 
     def clear(self):
         """Merest panel ke kondisi awal."""

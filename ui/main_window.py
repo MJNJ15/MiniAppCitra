@@ -4,7 +4,7 @@ import cv2
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFileDialog, QMessageBox, QToolBar
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -51,6 +51,15 @@ class MainWindow(QMainWindow):
         # Variabel Webcam
         self.webcam_worker = None
         self.webcam_active = False
+
+        # State histogram real-time (di-throttle via QTimer)
+        self._hist_timer = None
+        self._hist_raw_latest = None
+        self._hist_raw_dirty = False
+        self._hist_processed_latest = None
+        self._hist_processed_dirty = False
+        self._hist_processing_active = False
+        self._right_hist_shown = False
         
         self._init_ui()
         self._create_toolbar()
@@ -83,8 +92,9 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(control_layout, stretch=1)
 
     def _connect_signals(self):
-        self.method_panel.method_selected.connect(self.control_panel.update_inputs)
-        self.method_panel.method_cleared.connect(self._on_method_cleared)
+        self.method_panel.methods_changed.connect(self.control_panel.update_methods)
+        self.method_panel.limit_exceeded.connect(
+            lambda: self.statusBar().showMessage("Maksimal 5 metode dapat dipilih."))
         self.control_panel.process_requested.connect(self._on_process_requested)
         self.control_panel.webcam_toggle_requested.connect(self._on_webcam_toggle)
         self.control_panel.reset_requested.connect(self._on_reset_requested)
@@ -121,7 +131,15 @@ class MainWindow(QMainWindow):
         self.webcam_worker.error_occurred.connect(self._on_webcam_error)
         self.webcam_worker.started_signal.connect(self._on_webcam_started)
         self.webcam_worker.stopped_signal.connect(self._on_webcam_stopped)
-        
+        self.webcam_worker.hist_raw_ready.connect(self._on_webcam_hist_raw_ready)
+        self.webcam_worker.hist_processed_ready.connect(self._on_webcam_hist_processed_ready)
+
+        # Timer throttle: histogram dirender maksimal ~8x/detik, bukan tiap frame
+        self._hist_timer = QTimer(self)
+        self._hist_timer.setInterval(120)
+        self._hist_timer.timeout.connect(self._flush_hist_updates)
+        self._hist_timer.start()
+
         self.webcam_worker.start()
         self.statusBar().showMessage("Memulai webcam...")
 
@@ -133,11 +151,36 @@ class MainWindow(QMainWindow):
 
     def _on_webcam_frame_raw_ready(self, pixmap):
         """Terima frame mentah dari webcam → tampilkan di panel KIRI."""
-        self.left_panel.set_image(pixmap)
+        self.left_panel.set_image(pixmap, smooth=False)
 
     def _on_webcam_frame_processed_ready(self, pixmap):
         """Terima frame hasil proses → tampilkan di panel KANAN."""
-        self.right_panel.set_image(pixmap)
+        self.right_panel.set_image(pixmap, smooth=False)
+
+    def _on_webcam_hist_raw_ready(self, hist):
+        """Terima data histogram frame mentah (tidak langsung render, menunggu timer)."""
+        self._hist_raw_latest = hist
+        self._hist_raw_dirty = True
+
+    def _on_webcam_hist_processed_ready(self, hist):
+        """Terima data histogram frame hasil proses (tidak langsung render, menunggu timer)."""
+        self._hist_processed_latest = hist
+        self._hist_processed_dirty = True
+
+    def _flush_hist_updates(self):
+        """Render histogram tertunda secara terkumpul (throttle 120ms)."""
+        if self._hist_raw_dirty:
+            self.left_panel.update_histogram_counts(self._hist_raw_latest)
+            self._hist_raw_dirty = False
+
+        if self._hist_processed_dirty:
+            self.right_panel.update_histogram_counts(self._hist_processed_latest)
+            self._hist_processed_dirty = False
+            self._right_hist_shown = True
+        elif self.webcam_active and not self._hist_processing_active and self._right_hist_shown:
+            # Tidak ada processor aktif → bersihkan histogram panel kanan
+            self.right_panel.histogram_widget.clear()
+            self._right_hist_shown = False
 
     def _on_webcam_error(self, message: str):
         QMessageBox.critical(self, "Error Webcam", message)
@@ -156,48 +199,77 @@ class MainWindow(QMainWindow):
         self.result_image_np = None
         self.left_panel.clear()
         self.right_panel.clear()
+
+        # Bersihkan timer & state histogram real-time
+        if self._hist_timer is not None:
+            self._hist_timer.stop()
+            self._hist_timer = None
+        self._hist_raw_latest = None
+        self._hist_raw_dirty = False
+        self._hist_processed_latest = None
+        self._hist_processed_dirty = False
+        self._hist_processing_active = False
+        self._right_hist_shown = False
+
         self.statusBar().showMessage("Webcam dihentikan.")
 
     # =================================================================
     # LOGIKA TOMBOL PROSES (CERDAS: Statis vs Webcam)
     # =================================================================
     
-    def _on_process_requested(self, params: dict):
+    def _on_process_requested(self, params_list: list):
         """
-        Handler tombol Proses. Berperilaku berbeda tergantung mode:
-        - Jika webcam AKTIF: terapkan metode ke webcam secara real-time (panel kanan)
-        - Jika webcam TIDAK AKTIF: proses citra statis yang dimuat
+        Handler tombol Proses.
+        params_list: [(nama_metode + parameter), ...] sesuai urutan proses.
         """
-        method_name = params.get('method')
-        processor = self.processors.get(method_name)
-        
-        if not processor:
-            QMessageBox.critical(self, "Error", f"Processor untuk '{method_name}' tidak ditemukan.")
+        if not params_list:
             return
-        
-        if self.webcam_active:
-            # MODE WEBCAM: terapkan processor ke worker yang sedang berjalan
-            self.webcam_worker.set_processor(processor, params)
-            self.statusBar().showMessage(f"Webcam: metode '{method_name}' diterapkan secara real-time  {params}.")
-        else:
-            # MODE STATIS: proses citra yang dimuat dari file
-            self._process_static_image(processor, params)
 
-    def _process_static_image(self, processor, params: dict):
-        """Memproses citra statis yang dimuat dari file."""
+        # Validasi semua metode dikenal
+        for item in params_list:
+            method_name = item.get("method")
+            if method_name not in self.processors:
+                QMessageBox.critical(self, "Error",
+                                     f"Processor untuk '{method_name}' tidak ditemukan.")
+                return
+
+        if self.webcam_active:
+            # MODE WEBCAM: daftar processor diterapkan berantai di worker
+            chain = [
+                (self.processors[item["method"]],
+                 {k: v for k, v in item.items() if k != "method"})
+                for item in params_list
+            ]
+            self.webcam_worker.set_processors(chain)
+            self._hist_processing_active = True
+            names = " → ".join(item["method"] for item in params_list)
+            self.statusBar().showMessage(f"Webcam: rantai [{names}] aktif secara real-time.")
+        else:
+            # MODE STATIS: proses citra dengan seluruh rantai
+            self._process_static_image(params_list)
+
+    def _process_static_image(self, params_list: list):
+        """Memproses citra statis melalui seluruh rantai metode."""
         if self.original_image_np is None:
-            QMessageBox.warning(self, "Peringatan", 
+            QMessageBox.warning(self, "Peringatan",
                                 "Muat citra terlebih dahulu melalui tombol '📂 Buka', atau aktifkan webcam.")
             return
-        
+
         try:
-            self.statusBar().showMessage(f"Memproses: {params.get('method')}...")
-            self.result_image_np = processor.process(self.original_image_np, **params)
-            
-            pixmap = cv2_to_qpixmap(self.result_image_np)
+            names = " → ".join(item["method"] for item in params_list)
+            self.statusBar().showMessage(f"Memproses: {names}...")
+
+            result = self.original_image_np.copy()
+            for item in params_list:
+                processor = self.processors[item["method"]]
+                kwargs = {k: v for k, v in item.items() if k != "method"}
+                result = processor.process(result, **kwargs)
+            self.result_image_np = result
+
+            pixmap = cv2_to_qpixmap(result)
             self.right_panel.set_image(pixmap)
-            self.right_panel.update_histogram(self.result_image_np)
-            self.statusBar().showMessage(f"Selesai memproses: {params.get('method')}")
+            self.right_panel.update_histogram(result)
+            self.statusBar().showMessage(f"Selesai memproses: {names}")
         except Exception as e:
             self.statusBar().showMessage("Terjadi error saat memproses.")
             QMessageBox.critical(self, "Error", f"Gagal memproses citra:\n{str(e)}")
@@ -205,10 +277,6 @@ class MainWindow(QMainWindow):
     # =================================================================
     # LOGIKA TOMBOL RESET
     # =================================================================
-
-    def _on_method_cleared(self):
-        """Handler saat pemilihan metode di-clear dari MethodPanel."""
-        self.control_panel.clear_inputs()
 
     def _on_reset_requested(self):
         """
@@ -226,6 +294,13 @@ class MainWindow(QMainWindow):
             # Hapus processor aktif dari worker agar hanya menampilkan feed mentah
             if self.webcam_worker:
                 self.webcam_worker.clear_processor()
+
+            # Reset state histogram hasil proses
+            self._hist_processing_active = False
+            self._hist_processed_dirty = False
+            self._hist_processed_latest = None
+            self._right_hist_shown = False
+            self.right_panel.histogram_widget.clear()
             
             # Kosongkan HANYA panel kanan (hasil proses)
             self.right_panel.clear()

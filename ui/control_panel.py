@@ -1,19 +1,19 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QGroupBox, QHBoxLayout, 
-                               QPushButton, QLabel, QSpinBox, QDoubleSpinBox, 
-                               QSlider, QComboBox, QGridLayout)
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QGroupBox, QHBoxLayout, QScrollArea,
+    QPushButton, QLabel, QSpinBox, QDoubleSpinBox,
+    QSlider, QComboBox, QGridLayout,
+)
 from PySide6.QtCore import Signal, Qt
 
 
 class ControlPanel(QWidget):
-    process_requested = Signal(dict)
+    process_requested = Signal(object)
     webcam_toggle_requested = Signal()
     reset_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.current_method = ""
-        self.param_widgets = {}
-        self.kernel_spinboxes = []
+        self.method_groups = []   # [{'name', 'widgets', 'kernel'}, ...]
         self.webcam_active = False
         self._init_ui()
 
@@ -40,10 +40,18 @@ class ControlPanel(QWidget):
         
         process_group.setLayout(process_layout)
         
+        # Area input di dalam scroll area agar muat untuk banyak metode
         self.input_group = QGroupBox("INPUT NILAI")
-        self.input_layout = QVBoxLayout()
-        self.input_group.setLayout(self.input_layout)
-        
+        self.input_scroll = QScrollArea()
+        self.input_scroll.setWidgetResizable(True)
+        self.input_content = QWidget()
+        self.input_layout = QVBoxLayout(self.input_content)
+        self.input_scroll.setWidget(self.input_content)
+
+        outer_layout = QVBoxLayout()
+        outer_layout.addWidget(self.input_scroll)
+        self.input_group.setLayout(outer_layout)
+
         main_layout.addWidget(process_group)
         main_layout.addWidget(self.input_group)
         self.setLayout(main_layout)
@@ -68,11 +76,8 @@ class ControlPanel(QWidget):
     def clear_inputs(self):
         """Mengosongkan panel input nilai."""
         self._clear_layout(self.input_layout)
-        self.param_widgets = {}
-        self.kernel_spinboxes = []
-        self.current_method = ""
-        
-        # Tampilkan pesan informatif
+        self.method_groups = []
+
         label = QLabel("Tidak ada metode yang dipilih.")
         label.setAlignment(Qt.AlignCenter)
         label.setStyleSheet("color: #888; font-style: italic;")
@@ -88,36 +93,57 @@ class ControlPanel(QWidget):
                 else:
                     self._clear_layout(item.layout())
 
-    def update_inputs(self, method_name: str, default_params: dict):
-        self.current_method = method_name
+    def update_methods(self, methods):
+        """
+        Membangun panel input untuk daftar metode terpilih.
+        methods: [(nama_metode, default_params), ...] sesuai urutan proses.
+        """
         self._clear_layout(self.input_layout)
-        self.param_widgets = {}
-        self.kernel_spinboxes = []
+        self.method_groups = []
+
+        if not methods:
+            label = QLabel("Tidak ada metode yang dipilih.")
+            label.setAlignment(Qt.AlignCenter)
+            label.setStyleSheet("color: #888; font-style: italic;")
+            self.input_layout.addWidget(label)
+            return
+
+        for idx, (method_name, default_params) in enumerate(methods, start=1):
+            group = QGroupBox(f"{idx}. {method_name}")
+            group_layout = QVBoxLayout()
+            entry = {"name": method_name, "widgets": {}, "kernel": None}
+            self._build_group_inputs(group_layout, method_name, default_params, entry)
+            group.setLayout(group_layout)
+            self.input_layout.addWidget(group)
+            self.method_groups.append(entry)
+
+    def _build_group_inputs(self, layout, method_name, default_params, entry):
+        """Bangun widget input untuk SATU metode ke dalam `layout`."""
+        widgets = entry["widgets"]
 
         if method_name == "Thresholding":
-            self._add_spinbox("threshold", "Threshold (0-255):", 0, 255, default_params.get("threshold", 128))
+            self._add_spinbox(layout, widgets, "threshold", "Threshold (0-255):", 0, 255, default_params.get("threshold", 128))
         elif method_name == "Thresholding Double":
-            self._add_spinbox("t1", "T1 (0-255):", 0, 255, default_params.get("t1", 50))
-            self._add_spinbox("t2", "T2 (0-255):", 0, 255, default_params.get("t2", 150))
+            self._add_spinbox(layout, widgets, "t1", "T1 (0-255):", 0, 255, default_params.get("t1", 50))
+            self._add_spinbox(layout, widgets, "t2", "T2 (0-255):", 0, 255, default_params.get("t2", 150))
         elif method_name == "Brightness":
-            self._add_slider("value", "Brightness (-100 to +100):", -100, 100, default_params.get("value", 0))
+            self._add_slider(layout, widgets, "value", "Brightness (-100 to +100):", -100, 100, default_params.get("value", 0))
         elif method_name == "Contrast":
-            self._add_doublespinbox("factor", "Contrast Factor (0.5 - 3.0):", 0.5, 3.0, 0.1, default_params.get("factor", 1.0))
+            self._add_doublespinbox(layout, widgets, "factor", "Contrast Factor (0.5 - 3.0):", 0.5, 3.0, 0.1, default_params.get("factor", 1.0))
         elif method_name == "Noise":
-            self._add_combobox("type", "Tipe Noise:", ["Gaussian", "Salt & Pepper"])
-            self._add_doublespinbox("amount", "Amount (0.0 - 1.0):", 0.0, 1.0, 0.05, 0.1)
+            self._add_combobox(layout, widgets, "type", "Tipe Noise:", ["Gaussian", "Salt & Pepper"])
+            self._add_doublespinbox(layout, widgets, "amount", "Amount (0.0 - 1.0):", 0.0, 1.0, 0.05, 0.1)
         elif method_name == "Edge Detection":
-            self._add_combobox("edge_method", "Metode:", ["Canny", "Sobel X", "Sobel Y"])
+            self._add_combobox(layout, widgets, "edge_method", "Metode:", ["Canny", "Sobel X", "Sobel Y"])
         elif method_name == "Smoothing":
-            self._add_combobox("type", "Tipe Blur:", ["Gaussian", "Average", "Median"])
-            self._add_spinbox("kernel_size", "Kernel Size (3, 5, 7):", 3, 7, 3)
+            self._add_combobox(layout, widgets, "type", "Tipe Blur:", ["Gaussian", "Average", "Median"])
+            self._add_spinbox(layout, widgets, "kernel_size", "Kernel Size (3, 5, 7):", 3, 7, 3)
         elif method_name == "Convolution":
-            label = QLabel("Kernel 3x3:")
-            self.input_layout.addWidget(label)
+            layout.addWidget(QLabel("Kernel 3x3:"))
             grid_widget = QWidget()
             grid_layout = QGridLayout()
-            default_kernel = [[0,0,0],[0,1,0],[0,0,0]]
-            self.kernel_spinboxes = []
+            default_kernel = [[0, 0, 0], [0, 1, 0], [0, 0, 0]]
+            kernel_rows = []
             for i in range(3):
                 row = []
                 for j in range(3):
@@ -127,78 +153,80 @@ class ControlPanel(QWidget):
                     sb.setValue(default_kernel[i][j])
                     grid_layout.addWidget(sb, i, j)
                     row.append(sb)
-                self.kernel_spinboxes.append(row)
+                kernel_rows.append(row)
+            entry["kernel"] = kernel_rows
             grid_widget.setLayout(grid_layout)
-            self.input_layout.addWidget(grid_widget)
+            layout.addWidget(grid_widget)
         elif method_name == "Mirroring":
-            self._add_combobox("direction", "Arah Cermin:", ["Horizontal", "Vertical", "Both"])
+            self._add_combobox(layout, widgets, "direction", "Arah Cermin:", ["Horizontal", "Vertical", "Both"])
         elif method_name == "Rotation":
-            self._add_spinbox("angle", "Sudut Rotasi (0-360°):", 0, 360, default_params.get("angle", 0))
+            self._add_spinbox(layout, widgets, "angle", "Sudut Rotasi (0-360°):", 0, 360, default_params.get("angle", 0))
         else:
             label = QLabel("Tidak ada parameter tambahan.")
             label.setAlignment(Qt.AlignCenter)
             label.setStyleSheet("color: #888; font-style: italic;")
-            self.input_layout.addWidget(label)
+            layout.addWidget(label)
 
-    def _add_spinbox(self, key, label_text, min_val, max_val, default):
-        layout = QHBoxLayout()
-        layout.addWidget(QLabel(label_text))
+    def _add_spinbox(self, layout, widgets, key, label_text, min_val, max_val, default):
+        row = QHBoxLayout()
+        row.addWidget(QLabel(label_text))
         spin = QSpinBox()
         spin.setRange(min_val, max_val)
         spin.setValue(default)
-        layout.addWidget(spin)
-        self.param_widgets[key] = spin
-        self.input_layout.addLayout(layout)
+        row.addWidget(spin)
+        widgets[key] = spin
+        layout.addLayout(row)
 
-    def _add_doublespinbox(self, key, label_text, min_val, max_val, step, default):
-        layout = QHBoxLayout()
-        layout.addWidget(QLabel(label_text))
+    def _add_doublespinbox(self, layout, widgets, key, label_text, min_val, max_val, step, default):
+        row = QHBoxLayout()
+        row.addWidget(QLabel(label_text))
         spin = QDoubleSpinBox()
         spin.setRange(min_val, max_val)
         spin.setSingleStep(step)
         spin.setValue(default)
-        layout.addWidget(spin)
-        self.param_widgets[key] = spin
-        self.input_layout.addLayout(layout)
+        row.addWidget(spin)
+        widgets[key] = spin
+        layout.addLayout(row)
 
-    def _add_slider(self, key, label_text, min_val, max_val, default):
-        layout = QHBoxLayout()
-        layout.addWidget(QLabel(label_text))
+    def _add_slider(self, layout, widgets, key, label_text, min_val, max_val, default):
+        row = QHBoxLayout()
+        row.addWidget(QLabel(label_text))
         slider = QSlider(Qt.Horizontal)
         slider.setRange(min_val, max_val)
         slider.setValue(default)
-        layout.addWidget(slider)
+        row.addWidget(slider)
         val_label = QLabel(str(default))
         slider.valueChanged.connect(lambda v: val_label.setText(str(v)))
-        layout.addWidget(val_label)
-        self.param_widgets[key] = slider
-        self.input_layout.addLayout(layout)
+        row.addWidget(val_label)
+        widgets[key] = slider
+        layout.addLayout(row)
 
-    def _add_combobox(self, key, label_text, items):
-        layout = QHBoxLayout()
-        layout.addWidget(QLabel(label_text))
+    def _add_combobox(self, layout, widgets, key, label_text, items):
+        row = QHBoxLayout()
+        row.addWidget(QLabel(label_text))
         combo = QComboBox()
         combo.addItems(items)
-        layout.addWidget(combo)
-        self.param_widgets[key] = combo
-        self.input_layout.addLayout(layout)
+        row.addWidget(combo)
+        widgets[key] = combo
+        layout.addLayout(row)
 
     def _on_process_clicked(self):
         """
-        Mengumpulkan parameter dan emit sinyal.
-        MainWindow yang akan memutuskan: proses citra statis atau terapkan ke webcam.
+        Mengumpulkan parameter dari SEMUA group metode dan emit sinyal.
+        Hasil: list dict, satu per metode (urut = urutan proses).
         """
-        params = {'method': self.current_method}
-        for key, widget in self.param_widgets.items():
-            if isinstance(widget, (QSpinBox, QDoubleSpinBox)):
-                params[key] = widget.value()
-            elif isinstance(widget, QSlider):
-                params[key] = widget.value()
-            elif isinstance(widget, QComboBox):
-                params[key] = widget.currentText()
-                
-        if self.current_method == "Convolution" and self.kernel_spinboxes:
-            kernel = [[sb.value() for sb in row] for row in self.kernel_spinboxes]
-            params['kernel'] = kernel
-            
-        self.process_requested.emit(params)
+        params_list = []
+        for g in self.method_groups:
+            params = {"method": g["name"]}
+            for key, widget in g["widgets"].items():
+                if isinstance(widget, (QSpinBox, QDoubleSpinBox)):
+                    params[key] = widget.value()
+                elif isinstance(widget, QSlider):
+                    params[key] = widget.value()
+                elif isinstance(widget, QComboBox):
+                    params[key] = widget.currentText()
+            if g["kernel"] is not None:
+                params["kernel"] = [[sb.value() for sb in row] for row in g["kernel"]]
+            params_list.append(params)
+
+        self.process_requested.emit(params_list)
