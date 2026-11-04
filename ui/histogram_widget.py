@@ -18,7 +18,6 @@ class HistogramWidget(QWidget):
       - clear()                         : kosongkan grafik
     """
 
-    BG_COLOR = QColor("#f0f0f0")
     CHANNEL_COLORS = (
         QColor(255, 0, 0, 160),
         QColor(0, 170, 0, 160),
@@ -86,7 +85,6 @@ class HistogramWidget(QWidget):
     def paintEvent(self, event):
         p = QPainter(self)
         w, h = self.width(), self.height()
-        p.fillRect(self.rect(), self.BG_COLOR)
 
         # Margin untuk label sumbu
         mL, mR, mT, mB = 44, 6, 4, 16
