@@ -34,9 +34,9 @@ class ControlPanel(QWidget):
         self.btn_webcam.clicked.connect(self._on_webcam_toggle)
         process_layout.addWidget(self.btn_webcam)
 
-        self.btn_snapshot = QPushButton("📸 Ambil Foto")
+        self.btn_snapshot = QPushButton("Ambil Foto")
         self.btn_snapshot.setStyleSheet("font-weight: bold; font-size: 14px; min-height: 30px; background-color: #607D8B; color: white;")
-        self.btn_snapshot.setEnabled(False)  # aktif hanya saat webcam menyala
+        self.btn_snapshot.setVisible(False)  # muncul hanya saat webcam menyala
         self.btn_snapshot.clicked.connect(self._on_snapshot_clicked)
         process_layout.addWidget(self.btn_snapshot)
 
@@ -66,7 +66,7 @@ class ControlPanel(QWidget):
     def set_webcam_state(self, active: bool):
         """Update status tombol webcam. Tombol Proses TIDAK dinonaktifkan."""
         self.webcam_active = active
-        self.btn_snapshot.setEnabled(active)
+        self.btn_snapshot.setVisible(active)
         if active:
             self.btn_webcam.setText("⏹ Stop Webcam")
             self.btn_webcam.setStyleSheet("font-weight: bold; font-size: 14px; min-height: 30px; background-color: #f44336; color: white;")
