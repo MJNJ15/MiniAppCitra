@@ -60,6 +60,7 @@ class MainWindow(QMainWindow):
         self._hist_processed_dirty = False
         self._hist_processing_active = False
         self._right_hist_shown = False
+        self._feed_frozen = False   # True: panel kiri menampilkan foto capture (bukan live)
         
         self._init_ui()
         self._create_toolbar()
@@ -152,6 +153,8 @@ class MainWindow(QMainWindow):
 
     def _on_webcam_frame_raw_ready(self, pixmap):
         """Terima frame mentah dari webcam → tampilkan di panel KIRI."""
+        if self._feed_frozen:
+            return  # foto hasil 'Ambil Foto' sedang ditampilkan
         self.left_panel.set_image(pixmap, smooth=False)
 
     def _on_webcam_frame_processed_ready(self, pixmap):
@@ -211,6 +214,7 @@ class MainWindow(QMainWindow):
         self._hist_processed_dirty = False
         self._hist_processing_active = False
         self._right_hist_shown = False
+        self._feed_frozen = False
 
         self.statusBar().showMessage("Webcam dihentikan.")
 
@@ -224,6 +228,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Peringatan", "Belum ada frame dari webcam.")
             return
 
+        self._feed_frozen = True  # kunci panel kiri pada foto ini
         self.original_image_np = frame.copy()
         self.result_image_np = frame.copy()  # agar tombol Simpan berfungsi
 
@@ -232,7 +237,7 @@ class MainWindow(QMainWindow):
         self.left_panel.update_histogram(frame)
 
         h, w = frame.shape[:2]
-        self.statusBar().showMessage(f"Foto diambil: {w}x{h} px. Klik 💾 Simpan untuk menyimpan.")
+        self.statusBar().showMessage(f"Foto diambil: {w}x{h} px. Klik 💾 Simpan, atau Stop Webcam untuk kembali live.")
 
     # =================================================================
     # LOGIKA TOMBOL PROSES (CERDAS: Statis vs Webcam)
@@ -321,6 +326,7 @@ class MainWindow(QMainWindow):
             self._hist_processed_dirty = False
             self._hist_processed_latest = None
             self._right_hist_shown = False
+            self._feed_frozen = False  # kembali ke mode live raw
             self.right_panel.histogram_widget.clear()
             
             # Kosongkan HANYA panel kanan (hasil proses)
