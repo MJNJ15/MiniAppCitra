@@ -4,7 +4,7 @@ import cv2
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFileDialog, QMessageBox, QToolBar
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -51,6 +51,15 @@ class MainWindow(QMainWindow):
         # Variabel Webcam
         self.webcam_worker = None
         self.webcam_active = False
+
+        # State histogram real-time (di-throttle via QTimer)
+        self._hist_timer = None
+        self._hist_raw_latest = None
+        self._hist_raw_dirty = False
+        self._hist_processed_latest = None
+        self._hist_processed_dirty = False
+        self._hist_processing_active = False
+        self._right_hist_shown = False
         
         self._init_ui()
         self._create_toolbar()
@@ -121,7 +130,15 @@ class MainWindow(QMainWindow):
         self.webcam_worker.error_occurred.connect(self._on_webcam_error)
         self.webcam_worker.started_signal.connect(self._on_webcam_started)
         self.webcam_worker.stopped_signal.connect(self._on_webcam_stopped)
-        
+        self.webcam_worker.hist_raw_ready.connect(self._on_webcam_hist_raw_ready)
+        self.webcam_worker.hist_processed_ready.connect(self._on_webcam_hist_processed_ready)
+
+        # Timer throttle: histogram dirender maksimal ~8x/detik, bukan tiap frame
+        self._hist_timer = QTimer(self)
+        self._hist_timer.setInterval(120)
+        self._hist_timer.timeout.connect(self._flush_hist_updates)
+        self._hist_timer.start()
+
         self.webcam_worker.start()
         self.statusBar().showMessage("Memulai webcam...")
 
@@ -133,11 +150,36 @@ class MainWindow(QMainWindow):
 
     def _on_webcam_frame_raw_ready(self, pixmap):
         """Terima frame mentah dari webcam → tampilkan di panel KIRI."""
-        self.left_panel.set_image(pixmap)
+        self.left_panel.set_image(pixmap, smooth=False)
 
     def _on_webcam_frame_processed_ready(self, pixmap):
         """Terima frame hasil proses → tampilkan di panel KANAN."""
-        self.right_panel.set_image(pixmap)
+        self.right_panel.set_image(pixmap, smooth=False)
+
+    def _on_webcam_hist_raw_ready(self, hist):
+        """Terima data histogram frame mentah (tidak langsung render, menunggu timer)."""
+        self._hist_raw_latest = hist
+        self._hist_raw_dirty = True
+
+    def _on_webcam_hist_processed_ready(self, hist):
+        """Terima data histogram frame hasil proses (tidak langsung render, menunggu timer)."""
+        self._hist_processed_latest = hist
+        self._hist_processed_dirty = True
+
+    def _flush_hist_updates(self):
+        """Render histogram tertunda secara terkumpul (throttle 120ms)."""
+        if self._hist_raw_dirty:
+            self.left_panel.update_histogram_counts(self._hist_raw_latest)
+            self._hist_raw_dirty = False
+
+        if self._hist_processed_dirty:
+            self.right_panel.update_histogram_counts(self._hist_processed_latest)
+            self._hist_processed_dirty = False
+            self._right_hist_shown = True
+        elif self.webcam_active and not self._hist_processing_active and self._right_hist_shown:
+            # Tidak ada processor aktif → bersihkan histogram panel kanan
+            self.right_panel.histogram_widget.clear()
+            self._right_hist_shown = False
 
     def _on_webcam_error(self, message: str):
         QMessageBox.critical(self, "Error Webcam", message)
@@ -156,6 +198,18 @@ class MainWindow(QMainWindow):
         self.result_image_np = None
         self.left_panel.clear()
         self.right_panel.clear()
+
+        # Bersihkan timer & state histogram real-time
+        if self._hist_timer is not None:
+            self._hist_timer.stop()
+            self._hist_timer = None
+        self._hist_raw_latest = None
+        self._hist_raw_dirty = False
+        self._hist_processed_latest = None
+        self._hist_processed_dirty = False
+        self._hist_processing_active = False
+        self._right_hist_shown = False
+
         self.statusBar().showMessage("Webcam dihentikan.")
 
     # =================================================================
@@ -178,6 +232,7 @@ class MainWindow(QMainWindow):
         if self.webcam_active:
             # MODE WEBCAM: terapkan processor ke worker yang sedang berjalan
             self.webcam_worker.set_processor(processor, params)
+            self._hist_processing_active = True
             self.statusBar().showMessage(f"Webcam: metode '{method_name}' diterapkan secara real-time  {params}.")
         else:
             # MODE STATIS: proses citra yang dimuat dari file
@@ -226,6 +281,13 @@ class MainWindow(QMainWindow):
             # Hapus processor aktif dari worker agar hanya menampilkan feed mentah
             if self.webcam_worker:
                 self.webcam_worker.clear_processor()
+
+            # Reset state histogram hasil proses
+            self._hist_processing_active = False
+            self._hist_processed_dirty = False
+            self._hist_processed_latest = None
+            self._right_hist_shown = False
+            self.right_panel.histogram_widget.clear()
             
             # Kosongkan HANYA panel kanan (hasil proses)
             self.right_panel.clear()
