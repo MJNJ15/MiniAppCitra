@@ -98,6 +98,7 @@ class MainWindow(QMainWindow):
         self.control_panel.process_requested.connect(self._on_process_requested)
         self.control_panel.webcam_toggle_requested.connect(self._on_webcam_toggle)
         self.control_panel.reset_requested.connect(self._on_reset_requested)
+        self.control_panel.snapshot_requested.connect(self._on_snapshot_requested)
 
     def _create_toolbar(self):
         toolbar = QToolBar("Main Toolbar")
@@ -212,6 +213,26 @@ class MainWindow(QMainWindow):
         self._right_hist_shown = False
 
         self.statusBar().showMessage("Webcam dihentikan.")
+
+    def _on_snapshot_requested(self):
+        """Tombol 'Ambil Foto': tangkap frame mentah terbaru ke panel kiri."""
+        if not self.webcam_active or self.webcam_worker is None:
+            return
+
+        frame = self.webcam_worker.snapshot_raw()
+        if frame is None:
+            QMessageBox.warning(self, "Peringatan", "Belum ada frame dari webcam.")
+            return
+
+        self.original_image_np = frame.copy()
+        self.result_image_np = frame.copy()  # agar tombol Simpan berfungsi
+
+        pixmap = cv2_to_qpixmap(frame)
+        self.left_panel.set_image(pixmap, smooth=True)
+        self.left_panel.update_histogram(frame)
+
+        h, w = frame.shape[:2]
+        self.statusBar().showMessage(f"Foto diambil: {w}x{h} px. Klik 💾 Simpan untuk menyimpan.")
 
     # =================================================================
     # LOGIKA TOMBOL PROSES (CERDAS: Statis vs Webcam)

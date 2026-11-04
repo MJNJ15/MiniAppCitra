@@ -31,6 +31,7 @@ class WebcamWorker(QThread):
         self._capture = None
         self._active_processors = []   # [(processor, params_dict), ...]
         self._frame_count = 0
+        self._last_raw_frame = None    # salinan frame mentah terbaru (untuk snapshot)
 
     def set_processors(self, processors: list):
         """
@@ -46,6 +47,12 @@ class WebcamWorker(QThread):
     def clear_processor(self):
         """Menghapus semua processor aktif (kembali ke mode raw only)."""
         self._active_processors = []
+
+    def snapshot_raw(self):
+        """Mengembalikan salinan frame mentah terbaru (atau None)."""
+        if self._last_raw_frame is None:
+            return None
+        return self._last_raw_frame.copy()
 
     def run(self):
         self._capture = cv2.VideoCapture(0)
@@ -64,6 +71,7 @@ class WebcamWorker(QThread):
                 break
 
             self._frame_count += 1
+            self._last_raw_frame = frame.copy()  # untuk tombol Ambil Foto
             emit_hist = (self._frame_count % self.HIST_EMIT_INTERVAL == 0)
 
             # Selalu kirim frame mentah ke panel kiri
