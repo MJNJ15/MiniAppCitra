@@ -216,16 +216,25 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Webcam dihentikan.")
 
     def _on_snapshot_requested(self):
-        """Tombol 'Ambil Foto': simpan frame mentah terbaru langsung ke file."""
+        """Tombol 'Ambil Foto': simpan frame HASIL PEMROSESAN ke file.
+
+        Jika belum ada pemrosesan aktif, tampilkan notifikasi.
+        """
         if not self.webcam_active or self.webcam_worker is None:
             return
 
-        frame = self.webcam_worker.snapshot_raw()
-        if frame is None:
-            QMessageBox.warning(self, "Peringatan", "Belum ada frame dari webcam.")
+        if not self.webcam_worker._active_processors:
+            QMessageBox.warning(
+                self, "Peringatan",
+                "Belum ada pemrosesan aktif. Pilih metode lalu klik 'Proses' terlebih dahulu.")
             return
 
-        default_name = time.strftime("webcam_%Y%m%d_%H%M%S.png")
+        frame = self.webcam_worker.snapshot_processed()
+        if frame is None:
+            QMessageBox.warning(self, "Peringatan", "Belum ada frame hasil pemrosesan.")
+            return
+
+        default_name = time.strftime("webcam_processed_%Y%m%d_%H%M%S.png")
         file_path, _ = QFileDialog.getSaveFileName(
             self, "Simpan Foto Webcam", default_name,
             "PNG (*.png);;JPEG (*.jpg *.jpeg);;BMP (*.bmp)")
@@ -234,7 +243,7 @@ class MainWindow(QMainWindow):
 
         success = cv2.imwrite(file_path, frame)
         if success:
-            self.statusBar().showMessage(f"Foto webcam disimpan ke: {file_path}")
+            self.statusBar().showMessage(f"Foto hasil proses disimpan ke: {file_path}")
             QMessageBox.information(self, "Sukses", "Foto berhasil disimpan.")
         else:
             QMessageBox.critical(self, "Error", "Gagal menyimpan foto.")

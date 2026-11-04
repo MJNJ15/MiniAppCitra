@@ -32,6 +32,7 @@ class WebcamWorker(QThread):
         self._active_processors = []   # [(processor, params_dict), ...]
         self._frame_count = 0
         self._last_raw_frame = None    # salinan frame mentah terbaru (untuk snapshot)
+        self._last_processed_frame = None  # salinan frame hasil proses terbaru (untuk snapshot)
 
     def set_processors(self, processors: list):
         """
@@ -53,6 +54,12 @@ class WebcamWorker(QThread):
         if self._last_raw_frame is None:
             return None
         return self._last_raw_frame.copy()
+
+    def snapshot_processed(self):
+        """Mengembalikan salinan frame hasil proses terbaru (atau None)."""
+        if self._last_processed_frame is None:
+            return None
+        return self._last_processed_frame.copy()
 
     def run(self):
         self._capture = cv2.VideoCapture(0)
@@ -94,6 +101,7 @@ class WebcamWorker(QThread):
                     processed = frame.copy()
                     for processor, params in self._active_processors:
                         processed = processor.process(processed, **params)
+                    self._last_processed_frame = processed.copy()  # untuk Ambil Foto
                     processed_pixmap = cv2_to_qpixmap(processed)
                     self.frame_processed_ready.emit(processed_pixmap)
                     if emit_hist:
