@@ -262,6 +262,34 @@ Semua processor mewarisi `BaseProcessor` dan mengimplementasikan `process(image,
 
 ## 7. Dokumentasi Library / Dependency / Fungsi
 
+### 7.0 Tautan dokumentasi resmi
+
+| Topik | Tautan |
+|---|---|
+| Repositori proyek (GitHub) | https://github.com/MJNJ15/MiniAppCitra |
+| Dokumentasi Python | https://docs.python.org/3/ |
+| PySide6 — Qt for Python | https://doc.qt.io/qtforpython-6/ |
+| PySide6.QtWidgets (widget) | https://doc.qt.io/qtforpython-6/PySide6/QtWidgets/index.html |
+| PySide6.QtCore (QThread, Signal, QTimer) | https://doc.qt.io/qtforpython-6/PySide6/QtCore/index.html |
+| PySide6.QtGui (QPainter, QImage, QPixmap) | https://doc.qt.io/qtforpython-6/PySide6/QtGui/index.html |
+| Qt Style Sheets (QSS) — referensi properti | https://doc.qt.io/qt-6/stylesheet-reference.html |
+| Tutorial PySide6 (Qt for Python) | https://doc.qt.io/qtforpython-6/tutorials/index.html |
+| OpenCV — tutorial Python | https://docs.opencv.org/4.x/d6/d00/tutorial_py_root.html |
+| OpenCV — cv2.calcHist (histogram) | https://docs.opencv.org/4.x/d1/db7/tutorial_py_histogram_begins.html |
+| OpenCV — cv2.threshold (thresholding) | https://docs.opencv.org/4.x/d7/d4d/tutorial_py_thresholding.html |
+| OpenCV — cv2.Canny (edge detection) | https://docs.opencv.org/4.x/da/d22/tutorial_py_canny.html |
+| OpenCV — cv2.Sobel (gradien) | https://docs.opencv.org/4.x/d5/d0f/tutorial_py_gradients.html |
+| OpenCV — cv2.filter2D (smoothing/konvolusi) | https://docs.opencv.org/4.x/d4/dbd/tutorial_py_filtering.html |
+| OpenCV — transformasi geometrik (warpAffine, flip) | https://docs.opencv.org/4.x/da/d54/tutorial_py_geometric_transformations.html |
+| OpenCV — cv2.equalizeHist | https://docs.opencv.org/4.x/d5/daf/tutorial_py_histogram_equalization.html |
+| OpenCV — modul video (VideoCapture) | https://docs.opencv.org/4.x/dd/d43/tutorial_py_video_display.html |
+| NumPy — dokumentasi resmi | https://numpy.org/doc/stable/ |
+| NumPy — numpy.histogram | https://numpy.org/doc/stable/reference/generated/numpy.histogram.html |
+| NumPy — numpy.clip | https://numpy.org/doc/stable/reference/generated/numpy.clip.html |
+| NumPy — numpy.random (noise) | https://numpy.org/doc/stable/reference/random/index.html |
+
+> **Catatan:** tautan OpenCV di atas memakai versi 4.x (stabil & banyak dipakai); perilaku API yang dipakai kode ini juga kompatibel dengan OpenCV 5.x, kecuali `cv2.calcHist` yang di 5.x mengembalikan array 1D (kode sudah menyesuaikan dengan `.ravel()`).
+
 ### 7.1 Dokumentasi library
 
 #### PySide6 (Qt for Python)
