@@ -24,6 +24,9 @@ class MethodPanel(QWidget):
         self._selected_order = []
         self._init_ui()
 
+    # ------------------------------------------------------------------
+    #  UI
+    # ------------------------------------------------------------------
     def _init_ui(self):
         main_layout = QVBoxLayout()
         main_layout.setSpacing(6)
@@ -84,6 +87,9 @@ class MethodPanel(QWidget):
         main_layout.addWidget(group)
         self.setLayout(main_layout)
 
+    # ------------------------------------------------------------------
+    #  HANDLER
+    # ------------------------------------------------------------------
     def _on_mode_toggled(self, checked: bool):
         if not checked:
             return
@@ -133,6 +139,9 @@ class MethodPanel(QWidget):
         ]
         self.methods_changed.emit(sel)
 
+    # ------------------------------------------------------------------
+    #  SELEKSI
+    # ------------------------------------------------------------------
     def clear_selection(self):
         """Menghilangkan semua pilihan metode (semua mode)."""
         # Qt: pada QButtonGroup eksklusif, setChecked(False) tidak berlaku

@@ -5,15 +5,9 @@ import numpy as np
 
 
 class HistogramWidget(QWidget):
-    """
-    Widget histogram berbasis QPainter murni (tanpa Matplotlib).
+    """Histogram berbasis QPainter (tanpa Matplotlib) agar render real-time murah.
 
-    Mengapa: pengukuran (640x480, offscreen) menunjukkan Matplotlib
-    canvas.draw_idle() memakan ~140 ms per update — tidak layak untuk
-    mode webcam real-time. QPainter menghabiskan <0,1 ms, sehingga
-    jalur histogram tidak lagi menjadi bottleneck UI thread.
-
-    API tetap kompatibel:
+    API:
       - update_histogram(image_np)      : terima array citra
       - update_histogram_counts(counts) : terima data histogram siap pakai
       - clear()                         : kosongkan grafik
@@ -33,7 +27,7 @@ class HistogramWidget(QWidget):
         self.setMinimumHeight(80)
 
     def update_histogram(self, image_np: np.ndarray):
-        """API lama: menerima array citra, menghitung histogram lalu render."""
+        """Mode statis: menerima array citra, menghitung histogram lalu render."""
         if image_np is None or image_np.size == 0:
             self.clear()
             return

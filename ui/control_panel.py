@@ -34,6 +34,9 @@ class ControlPanel(QWidget):
         btn.setStyleSheet(sheet)
         return btn
 
+    # ------------------------------------------------------------------
+    #  UI
+    # ------------------------------------------------------------------
     def _init_ui(self):
         main_layout = QVBoxLayout()
         
@@ -79,7 +82,7 @@ class ControlPanel(QWidget):
         self.setLayout(main_layout)
 
     def set_webcam_state(self, active: bool):
-        """Update status tombol webcam. Tombol Proses TIDAK dinonaktifkan."""
+        """Update status tombol webcam & visibilitas 'Ambil Foto'."""
         self.webcam_active = active
         self.btn_snapshot.setVisible(active)
         if active:
@@ -122,6 +125,9 @@ class ControlPanel(QWidget):
                 else:
                     self._clear_layout(item.layout())
 
+    # ------------------------------------------------------------------
+    #  INPUT METODE
+    # ------------------------------------------------------------------
     def update_methods(self, methods):
         """
         Membangun panel input untuk daftar metode terpilih.
@@ -239,6 +245,9 @@ class ControlPanel(QWidget):
         widgets[key] = combo
         layout.addLayout(row)
 
+    # ------------------------------------------------------------------
+    #  KOLEKSI PARAMETER
+    # ------------------------------------------------------------------
     def _on_process_clicked(self):
         """
         Mengumpulkan parameter dari SEMUA group metode dan emit sinyal.

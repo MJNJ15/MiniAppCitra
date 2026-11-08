@@ -7,8 +7,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QTimer
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from utils.image_utils import cv2_to_qpixmap
 from utils.constants import ImageConstants, UIConstants
 from utils.webcam_worker import WebcamWorker
@@ -107,9 +105,9 @@ class MainWindow(QMainWindow):
         toolbar.addAction("📂 Buka", self.open_image)
         toolbar.addAction("💾 Simpan", self.save_image)
 
-    # =================================================================
-    # LOGIKA WEBCAM (ALUR BARU)
-    # =================================================================
+    # ==================================================================
+    #  WEBCAM
+    # ==================================================================
     
     def _on_webcam_toggle(self):
         """Toggle webcam: mulai atau hentikan."""
@@ -119,10 +117,7 @@ class MainWindow(QMainWindow):
             self._stop_webcam()
 
     def _start_webcam(self):
-        """
-        Memulai webcam TANPA perlu memilih metode.
-        Panel kiri menampilkan feed mentah, panel kanan dikosongkan.
-        """
+        """Mulai webcam: panel kiri menampilkan feed mentah."""
         self.method_panel.clear_selection()
         self.control_panel.clear_inputs()
         self.webcam_worker = WebcamWorker()
@@ -215,6 +210,10 @@ class MainWindow(QMainWindow):
 
         self.statusBar().showMessage("Webcam dihentikan.")
 
+    # ==================================================================
+    #  AMBIL FOTO
+    # ==================================================================
+
     def _on_snapshot_requested(self):
         """Tombol 'Ambil Foto': simpan frame HASIL PEMROSESAN ke file.
 
@@ -248,9 +247,9 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.critical(self, "Error", "Gagal menyimpan foto.")
 
-    # =================================================================
-    # LOGIKA TOMBOL PROSES (CERDAS: Statis vs Webcam)
-    # =================================================================
+    # ==================================================================
+    #  PEMROSESAN
+    # ==================================================================
     
     def _on_process_requested(self, params_list: list):
         """
@@ -309,9 +308,9 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Terjadi error saat memproses.")
             QMessageBox.critical(self, "Error", f"Gagal memproses citra:\n{str(e)}")
 
-    # =================================================================
-    # LOGIKA TOMBOL RESET
-    # =================================================================
+    # ==================================================================
+    #  RESET
+    # ==================================================================
 
     def _on_reset_requested(self):
         """
@@ -355,9 +354,9 @@ class MainWindow(QMainWindow):
             
             self.statusBar().showMessage("Reset berhasil. Semua metode dan hasil telah dihapus.")
 
-    # =================================================================
-    # MANAJEMEN FILE
-    # =================================================================
+    # ==================================================================
+    #  MANAJEMEN FILE
+    # ==================================================================
     
     def open_image(self):
         """Membuka citra dari file. Otomatis menghentikan webcam jika aktif."""
@@ -384,9 +383,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Error", "Gagal memuat citra.")
 
     def save_image(self):
-        """Menyimpan citra hasil (dari proses statis atau screenshot dari webcam)."""
-        # Untuk webcam, kita bisa mengambil frame terakhir dari panel kanan
-        # Tapi untuk kesederhanaan, kita hanya simpan dari citra statis
+        """Menyimpan citra hasil pemrosesan ke file."""
         if self.result_image_np is None:
             QMessageBox.warning(self, "Peringatan", "Tidak ada citra hasil untuk disimpan.")
             return

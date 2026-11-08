@@ -4,15 +4,14 @@ from PySide6.QtCore import QThread, Signal
 from PySide6.QtGui import QPixmap
 
 from utils.image_utils import cv2_to_qpixmap
-from processors.base_processor import BaseProcessor
 
 
 class WebcamWorker(QThread):
-    """
-    QThread untuk membaca frame webcam secara real-time.
-    Mengirim dua jenis sinyal:
-      - frame_raw_ready: frame mentah dari kamera (untuk panel kiri)
-      - frame_processed_ready: frame hasil pengolahan (untuk panel kanan, hanya jika ada processor aktif)
+    """Membaca frame webcam di thread terpisah agar UI tetap responsif.
+
+    Mengirim ke UI:
+      - frame raw & histogram-nya                → panel kiri
+      - frame hasil proses & histogram-nya      → panel kanan (jika ada processor aktif)
     """
     frame_raw_ready = Signal(QPixmap)
     frame_processed_ready = Signal(QPixmap)
@@ -29,34 +28,20 @@ class WebcamWorker(QThread):
         super().__init__(parent)
         self._running = False
         self._capture = None
-        self._active_processors = []   # [(processor, params_dict), ...]
+        self._active_processors = []      # [(processor, params), ...]
         self._frame_count = 0
-        self._last_raw_frame = None    # salinan frame mentah terbaru (untuk snapshot)
-        self._last_processed_frame = None  # salinan frame hasil proses terbaru (untuk snapshot)
+        self._last_processed_frame = None # untuk tombol Ambil Foto
 
     def set_processors(self, processors: list):
-        """
-        Mengatur rantai processor yang diterapkan berurutan per frame.
-        processors: [(BaseProcessor, dict_parameter), ...] sesuai urutan.
-        """
+        """Set rantai processor yang diterapkan berurutan per frame."""
         self._active_processors = list(processors)
 
-    def set_processor(self, processor: BaseProcessor, params: dict = None):
-        """Kompatibilitas: set satu processor saja."""
-        self.set_processors([(processor, params)])
-
     def clear_processor(self):
-        """Menghapus semua processor aktif (kembali ke mode raw only)."""
+        """Hapus semua processor aktif (kembali ke mode raw only)."""
         self._active_processors = []
 
-    def snapshot_raw(self):
-        """Mengembalikan salinan frame mentah terbaru (atau None)."""
-        if self._last_raw_frame is None:
-            return None
-        return self._last_raw_frame.copy()
-
     def snapshot_processed(self):
-        """Mengembalikan salinan frame hasil proses terbaru (atau None)."""
+        """Salinan frame hasil proses terbaru (None jika belum ada)."""
         if self._last_processed_frame is None:
             return None
         return self._last_processed_frame.copy()
@@ -78,7 +63,6 @@ class WebcamWorker(QThread):
                 break
 
             self._frame_count += 1
-            self._last_raw_frame = frame.copy()  # untuk tombol Ambil Foto
             emit_hist = (self._frame_count % self.HIST_EMIT_INTERVAL == 0)
 
             # Selalu kirim frame mentah ke panel kiri
