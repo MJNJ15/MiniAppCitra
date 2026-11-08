@@ -222,35 +222,35 @@ Semua processor mewarisi `BaseProcessor` dan mengimplementasikan `process(image,
 
 ### 6.1 Transformasi titik piksel
 
-| Metode | Teori | Implementasi |
-|---|---|---|
-| **Grayscale** | Kombinasi bobot saluran R,G,B (OpenCV: 0.299R+0.587G+0.114B) | `cv2.cvtColor(BGR2GRAY)` |
-| **Negative** | Inversi intensitas: `s = 255 - r` | `cv2.bitwise_not` |
-| **Thresholding** | Binerisasi: piksel `< T` → 0, `≥ T` → 255 | `cv2.threshold(..., THRESH_BINARY)` |
-| **Thresholding Double** | Rentang: piksel pada `[t1, t2]` → 255, di luar → 0 | `np.where((gray>=t1)&(gray<=t2), 255, 0)` |
-| **Brightness** | Penambahan konstan: `s = r + b`, clipping [0,255] | `cv2.add(image, value)` (auto-clip) |
-| **Contrast** | Perenggangan seputar nilai 128: `s = f*(r-128)+128` | `np.clip(f*(img-128)+128, 0, 255)` |
+| Metode | Teori | Implementasi | Efek pada hasil gambar |
+|---|---|---|---|
+| **Grayscale** | Kombinasi bobot saluran R,G,B (OpenCV: 0.299R+0.587G+0.114B) | `cv2.cvtColor(BGR2GRAY)` | Warna hilang → citra abu-abu satu saluran; lebih mudah dianalisis untuk proses lanjutan (threshold, edge, histogram) |
+| **Negative** | Inversi intensitas: `s = 255 - r` | `cv2.bitwise_not` | Seperti negatif foto: area terang jadi gelap dan sebaliknya; warna berubah menjadi lawannya (mis. biru ↔ kuning) |
+| **Thresholding** | Binerisasi: piksel `< T` → 0, `≥ T` → 255 | `cv2.threshold(..., THRESH_BINARY)` | Citra jadi **biner hitam-putih** yang tegas (2 level); gradasi/kabut hilang, objek terang tampak putih di latar hitam |
+| **Thresholding Double** | Rentang: piksel pada `[t1, t2]` → 255, di luar → 0 | `np.where((gray>=t1)&(gray<=t2), 255, 0)` | Hanya piksel dengan intensitas dalam rentang yang tampak putih; berguna untuk menyorot objek dengan kecerahan sedang |
+| **Brightness** | Penambahan konstan: `s = r + b`, clipping [0,255] | `cv2.add(image, value)` (auto-clip) | Seluruh gambar rata-rata lebih terang (nilai positif) atau lebih gelap (negatif); kontras relatif tetap |
+| **Contrast** | Perenggangan seputar nilai 128: `s = f*(r-128)+128` | `np.clip(f*(img-128)+128, 0, 255)` | `factor > 1` → perbedaan terang-gelap menguat (bayangan lebih pekat, sorotan lebih menyala); `factor < 1` → gambar lebih datar/kusam |
 
 ### 6.2 Filtering & konvolusi
 
-| Metode | Teori | Implementasi |
-|---|---|---|
-| **Noise Gaussian** | Tambah derau berdistribusi normal `N(0, σ)`, σ = amount×50 | `np.random.normal(0, sigma, shape)` + clip |
-| **Noise Salt & Pepper** | Acak piksel jadi putih (salt) / hitam (pepper) sesuai amount | `np.random.randint` koordinat → set 255 / 0 |
-| **Edge Detection Canny** | Multi-tahap: Gaussian blur → gradien Sobel → non-maximum suppression → hysteresis threshold (100/200) | `cv2.Canny(gray, 100, 200)` |
-| **Edge Detection Sobel** | Perkiraan gradien orde-1: `Gx` (Sobel X) / `Gy` (Sobel Y); besaran tepi | `cv2.Sobel(gray, CV_64F, 1|0, ...)` → `np.absolute` |
-| **Histogram Equalization** | Ratakan distribusi tingkat keabuan agar kontras meningkat | `cv2.equalizeHist(gray)` |
-| **Emboss** | Kernel asimetris (±2/±1) memberi efek timbul 3D; hasil digeser +128 agar terlihat | `cv2.filter2D` + clip(+128) |
-| **Sharpening** | Kernel pusat tinggi (5) dengan tetangga negatif → pertegas tepi | `cv2.filter2D(image, -1, [[0,-1,0],[-1,5,-1],[0,-1,0]])` |
-| **Smoothing** | Penghalusan (blur): Average (rata-rata), Gaussian (bobot normal), Median (median lokal) — mengurangi noise | `cv2.blur` / `GaussianBlur` / `medianBlur` dengan kernel ganjil |
-| **Convolution 3x3** | Konvolusi kernel kustom apa pun yang dimasukkan pengguna | `cv2.filter2D(image, -1, kernel)` |
+| Metode | Teori | Implementasi | Efek pada hasil gambar |
+|---|---|---|---|
+| **Noise Gaussian** | Tambah derau berdistribusi normal `N(0, σ)`, σ = amount×50 | `np.random.normal(0, sigma, shape)` + clip | Muncul **butiran halus acak** (grain) menyebar merata di seluruh gambar seperti noise kamera |
+| **Noise Salt & Pepper** | Acak piksel jadi putih (salt) / hitam (pepper) sesuai amount | `np.random.randint` koordinat → set 255 / 0 | Muncul **titik-titik putih & hitam acak** seperti taburan garam-merica di atas gambar |
+| **Edge Detection Canny** | Multi-tahap: Gaussian blur → gradien Sobel → non-maximum suppression → hysteresis threshold (100/200) | `cv2.Canny(gray, 100, 200)` | Keluar **peta tepi biner** — garis tipis menandai kontur objek di atas latar hitam; area seragam hilang |
+| **Edge Detection Sobel** | Perkiraan gradien orde-1: `Gx` (Sobel X) / `Gy` (Sobel Y); besaran tepi | `cv2.Sobel(gray, CV_64F, 1|0, ...)` → `np.absolute` | **Sobel X** menyala pada tepi vertikal, **Sobel Y** pada tepi horizontal; area datar menjadi hitam |
+| **Histogram Equalization** | Ratakan distribusi tingkat keabuan agar kontras meningkat | `cv2.equalizeHist(gray)` | Kontras naik: area gelap jadi lebih terlihat, sorotan lebih tegas; histogram menyebar lebih rata |
+| **Emboss** | Kernel asimetris (±2/±1) memberi efek timbul 3D; hasil digeser +128 agar terlihat | `cv2.filter2D` + clip(+128) | Gambar tampak seperti **relief/timbul 3D** abu-abu dengan pencahayaan dari kiri-atas |
+| **Sharpening** | Kernel pusat tinggi (5) dengan tetangga negatif → pertegas tepi | `cv2.filter2D(image, -1, [[0,-1,0],[-1,5,-1],[0,-1,0]])` | Tepi objek tampak lebih tajam dan tegas; noise/grain ikut menguat |
+| **Smoothing** | Penghalusan (blur): Average (rata-rata), Gaussian (bobot normal), Median (median lokal) — mengurangi noise | `cv2.blur` / `GaussianBlur` / `medianBlur` dengan kernel ganjil | Gambar lebih lembut/kabur; noise berkurang, tetapi detail halus ikut hilang (semakin besar kernel semakin kabur) |
+| **Convolution 3x3** | Konvolusi kernel kustom apa pun yang dimasukkan pengguna | `cv2.filter2D(image, -1, kernel)` | Efek bergantung kernel: identitas → tidak berubah; sharpen → tegas; edge/emboss → sesuai kernel yang dipilih |
 
 ### 6.3 Transformasi geometrik
 
-| Metode | Teori | Implementasi |
-|---|---|---|
-| **Mirroring** | Membalikkan citra: Horizontal (flipCode=1), Vertical (0), Both (-1) | `cv2.flip(image, code)` |
-| **Rotation** | Rotasi sudut θ sekitar pusat; bounding box baru dihitung agar tidak terpotong; area kosong diisi putih | `cv2.getRotationMatrix2D` → `cv2.warpAffine(..., borderValue=(255,255,255))` |
+| Metode | Teori | Implementasi | Efek pada hasil gambar |
+|---|---|---|---|
+| **Mirroring** | Membalikkan citra: Horizontal (flipCode=1), Vertical (0), Both (-1) | `cv2.flip(image, code)` | Seperti pantulan cermin: Horizontal → kiri-kanan bertukar; Vertical → atas-bawah bertukar; Both → keduanya |
+| **Rotation** | Rotasi sudut θ sekitar pusat; bounding box baru dihitung agar tidak terpotong; area kosong diisi putih | `cv2.getRotationMatrix2D` → `cv2.warpAffine(..., borderValue=(255,255,255))` | Gambar berputar sesuai sudut; ukuran kanvas menyesuaikan sehingga tidak ada bagian terpotong; sudut-sudut baru terisi putih |
 
 ### 6.4 Histogram
 
