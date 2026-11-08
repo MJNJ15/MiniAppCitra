@@ -15,7 +15,7 @@ class ImagePanel(QWidget):
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignCenter)
         self.image_label.setMinimumHeight(300)
-        self.image_label.setStyleSheet("QLabel { background-color: #2b2b2b; color: #aaaaaa; border: 1px solid #555; }")
+        self.image_label.setStyleSheet("QLabel { background-color: #171b22; color: #7c8694; border: 1px solid #2c333f; border-radius: 8px; }")
         self.image_label.setText(f"[ {title} ]\nBelum ada citra dimuat")
         
         self.histogram_widget = HistogramWidget()

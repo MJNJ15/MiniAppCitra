@@ -18,30 +18,45 @@ class ControlPanel(QWidget):
         self.webcam_active = False
         self._init_ui()
 
+    @staticmethod
+    def _styled_button(text, base, hover, pressed, disabled=None):
+        """Buat QPushButton dengan gaya warna peran + state hover/pressed."""
+        btn = QPushButton(text)
+        sheet = (
+            f"QPushButton {{ background-color: {base}; color: white; "
+            f"font-weight: bold; font-size: 14px; min-height: 30px; "
+            f"border: none; border-radius: 8px; padding: 0 14px; }}"
+            f"QPushButton:hover {{ background-color: {hover}; }}"
+            f"QPushButton:pressed {{ background-color: {pressed}; }}"
+        )
+        if disabled:
+            sheet += f"QPushButton:disabled {{ background-color: {disabled}; color: #9aa4b2; }}"
+        btn.setStyleSheet(sheet)
+        return btn
+
     def _init_ui(self):
         main_layout = QVBoxLayout()
         
         process_group = QGroupBox("PROSES")
         process_layout = QHBoxLayout()
         
-        self.btn_process = QPushButton("▶ Proses")
-        self.btn_process.setStyleSheet("font-weight: bold; font-size: 14px; min-height: 30px; background-color: #2196F3; color: white;")
+        self.btn_process = self._styled_button("▶ Proses", "#2196F3", "#42a5f5", "#1976d2")
         self.btn_process.clicked.connect(self._on_process_clicked)
         process_layout.addWidget(self.btn_process)
         
-        self.btn_webcam = QPushButton("📷 Webcam")
-        self.btn_webcam.setStyleSheet("font-weight: bold; font-size: 14px; min-height: 30px; background-color: #4CAF50; color: white;")
+        self.btn_webcam = self._styled_button("📷 Webcam", "#43a047", "#66bb6a", "#2e7d32")
         self.btn_webcam.clicked.connect(self._on_webcam_toggle)
         process_layout.addWidget(self.btn_webcam)
 
-        self.btn_snapshot = QPushButton("Ambil Foto")
-        self.btn_snapshot.setStyleSheet("font-weight: bold; font-size: 14px; min-height: 30px; background-color: #607D8B; color: white;")
+        self.btn_snapshot = self._styled_button(
+            "Ambil Foto", "#546e7a", "#78909c", "#37474f",
+            disabled="#39424e",
+        )
         self.btn_snapshot.setVisible(False)  # muncul hanya saat webcam menyala
         self.btn_snapshot.clicked.connect(self._on_snapshot_clicked)
         process_layout.addWidget(self.btn_snapshot)
 
-        self.btn_reset = QPushButton("🔄 Reset")
-        self.btn_reset.setStyleSheet("font-weight: bold; font-size: 14px; min-height: 30px; background-color: #FF9800; color: white;")
+        self.btn_reset = self._styled_button("🔄 Reset", "#fb8c00", "#ffa726", "#ef6c00")
         self.btn_reset.clicked.connect(self._on_reset_clicked)
         process_layout.addWidget(self.btn_reset)
         
@@ -69,10 +84,12 @@ class ControlPanel(QWidget):
         self.btn_snapshot.setVisible(active)
         if active:
             self.btn_webcam.setText("⏹ Stop Webcam")
-            self.btn_webcam.setStyleSheet("font-weight: bold; font-size: 14px; min-height: 30px; background-color: #f44336; color: white;")
+            self.btn_webcam.setStyleSheet(
+                self._styled_button("⏹ Stop Webcam", "#e53935", "#ef5350", "#c62828").styleSheet())
         else:
             self.btn_webcam.setText(" Webcam")
-            self.btn_webcam.setStyleSheet("font-weight: bold; font-size: 14px; min-height: 30px; background-color: #4CAF50; color: white;")
+            self.btn_webcam.setStyleSheet(
+                self._styled_button(" Webcam", "#43a047", "#66bb6a", "#2e7d32").styleSheet())
 
     def _on_webcam_toggle(self):
         self.webcam_toggle_requested.emit()
