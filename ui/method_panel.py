@@ -6,10 +6,9 @@ from PySide6.QtCore import Signal
 
 
 class MethodPanel(QWidget):
-    """
-    Panel pemilihan metode dengan dua mode:
-      - Tunggal: eksklusif (seperti radio), perilaku lama.
-      - Ganda  : multi-pilih berurutan, maksimal MAX_METHODS metode.
+    """Panel pemilihan metode dengan dua mode:
+      - Tunggal: eksklusif (seperti radio).
+      - Multiple: multi-pilih berurutan, maksimal MAX_METHODS metode.
     Urutan proses = urutan klik.
     """
     MAX_METHODS = 5
@@ -35,7 +34,7 @@ class MethodPanel(QWidget):
         mode_box = QGroupBox("Mode Pemilihan")
         mode_layout = QHBoxLayout()
         self.rb_single = QRadioButton("Tunggal")
-        self.rb_multi = QRadioButton("Ganda")
+        self.rb_multi = QRadioButton("Multiple")
         self.rb_single.setChecked(True)
         self.rb_single.toggled.connect(self._on_mode_toggled)
         self.rb_multi.toggled.connect(self._on_mode_toggled)
