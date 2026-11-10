@@ -1,12 +1,11 @@
 import sys
 import os
+import time
 import cv2
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFileDialog, QMessageBox, QToolBar
 )
 from PySide6.QtCore import Qt, QTimer
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.image_utils import cv2_to_qpixmap
 from utils.constants import ImageConstants, UIConstants
@@ -98,6 +97,7 @@ class MainWindow(QMainWindow):
         self.control_panel.process_requested.connect(self._on_process_requested)
         self.control_panel.webcam_toggle_requested.connect(self._on_webcam_toggle)
         self.control_panel.reset_requested.connect(self._on_reset_requested)
+        self.control_panel.snapshot_requested.connect(self._on_snapshot_requested)
 
     def _create_toolbar(self):
         toolbar = QToolBar("Main Toolbar")
@@ -105,9 +105,9 @@ class MainWindow(QMainWindow):
         toolbar.addAction("📂 Buka", self.open_image)
         toolbar.addAction("💾 Simpan", self.save_image)
 
-    # =================================================================
-    # LOGIKA WEBCAM (ALUR BARU)
-    # =================================================================
+    # ==================================================================
+    #  WEBCAM
+    # ==================================================================
     
     def _on_webcam_toggle(self):
         """Toggle webcam: mulai atau hentikan."""
@@ -117,10 +117,7 @@ class MainWindow(QMainWindow):
             self._stop_webcam()
 
     def _start_webcam(self):
-        """
-        Memulai webcam TANPA perlu memilih metode.
-        Panel kiri menampilkan feed mentah, panel kanan dikosongkan.
-        """
+        """Mulai webcam: panel kiri menampilkan feed mentah."""
         self.method_panel.clear_selection()
         self.control_panel.clear_inputs()
         self.webcam_worker = WebcamWorker()
@@ -213,9 +210,46 @@ class MainWindow(QMainWindow):
 
         self.statusBar().showMessage("Webcam dihentikan.")
 
-    # =================================================================
-    # LOGIKA TOMBOL PROSES (CERDAS: Statis vs Webcam)
-    # =================================================================
+    # ==================================================================
+    #  AMBIL FOTO
+    # ==================================================================
+
+    def _on_snapshot_requested(self):
+        """Tombol 'Ambil Foto': simpan frame HASIL PEMROSESAN ke file.
+
+        Jika belum ada pemrosesan aktif, tampilkan notifikasi.
+        """
+        if not self.webcam_active or self.webcam_worker is None:
+            return
+
+        if not self.webcam_worker._active_processors:
+            QMessageBox.warning(
+                self, "Peringatan",
+                "Belum ada pemrosesan aktif. Pilih metode lalu klik 'Proses' terlebih dahulu.")
+            return
+
+        frame = self.webcam_worker.snapshot_processed()
+        if frame is None:
+            QMessageBox.warning(self, "Peringatan", "Belum ada frame hasil pemrosesan.")
+            return
+
+        default_name = time.strftime("webcam_processed_%Y%m%d_%H%M%S.png")
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Simpan Foto Webcam", default_name,
+            "PNG (*.png);;JPEG (*.jpg *.jpeg);;BMP (*.bmp)")
+        if not file_path:
+            return
+
+        success = cv2.imwrite(file_path, frame)
+        if success:
+            self.statusBar().showMessage(f"Foto hasil proses disimpan ke: {file_path}")
+            QMessageBox.information(self, "Sukses", "Foto berhasil disimpan.")
+        else:
+            QMessageBox.critical(self, "Error", "Gagal menyimpan foto.")
+
+    # ==================================================================
+    #  PEMROSESAN
+    # ==================================================================
     
     def _on_process_requested(self, params_list: list):
         """
@@ -274,9 +308,9 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Terjadi error saat memproses.")
             QMessageBox.critical(self, "Error", f"Gagal memproses citra:\n{str(e)}")
 
-    # =================================================================
-    # LOGIKA TOMBOL RESET
-    # =================================================================
+    # ==================================================================
+    #  RESET
+    # ==================================================================
 
     def _on_reset_requested(self):
         """
@@ -320,9 +354,9 @@ class MainWindow(QMainWindow):
             
             self.statusBar().showMessage("Reset berhasil. Semua metode dan hasil telah dihapus.")
 
-    # =================================================================
-    # MANAJEMEN FILE
-    # =================================================================
+    # ==================================================================
+    #  MANAJEMEN FILE
+    # ==================================================================
     
     def open_image(self):
         """Membuka citra dari file. Otomatis menghentikan webcam jika aktif."""
@@ -349,9 +383,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Error", "Gagal memuat citra.")
 
     def save_image(self):
-        """Menyimpan citra hasil (dari proses statis atau screenshot dari webcam)."""
-        # Untuk webcam, kita bisa mengambil frame terakhir dari panel kanan
-        # Tapi untuk kesederhanaan, kita hanya simpan dari citra statis
+        """Menyimpan citra hasil pemrosesan ke file."""
         if self.result_image_np is None:
             QMessageBox.warning(self, "Peringatan", "Tidak ada citra hasil untuk disimpan.")
             return

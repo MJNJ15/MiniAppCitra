@@ -1,9 +1,7 @@
 class ImageConstants:
-    """Konstanta terkait format dan batasan citra."""
+    """Format berkas citra yang didukung."""
+
     SUPPORTED_FORMATS = "Image Files (*.jpg *.jpeg *.png *.bmp);;All Files (*)"
-    DEFAULT_THRESHOLD = 128
-    MAX_PIXEL_VALUE = 255
-    MIN_PIXEL_VALUE = 0
 
 class UIConstants:
     """Konstanta terkait antarmuka pengguna."""
